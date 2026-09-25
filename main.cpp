@@ -74,7 +74,7 @@ int main() {
         vector<vector<int>> dir = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}};
         vector<int> valid_moves(4, 1);
 
-        if (state == 0 || state == KING) {
+        if (state == KING) {
             for (int max_depth = 1; max_depth <= 3; max_depth++) {
                 for (int i = 0; i < 4; i++) {
                     valid_moves[i] = !danger_dfs(tiles, 0, max_depth, 3+dir[i][0], 3+dir[i][1], ct.get_team().value);
