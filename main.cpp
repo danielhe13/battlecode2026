@@ -24,11 +24,11 @@ bool kill_depth_dfs(const vector<Tile> &tiles, int depth,
 
 // Best starting move for pearl -  DEFAULT
 int depth_dfs(const vector<Tile> &tiles, int depth, int max_depth, int row,
-    int col, int first_move);
+    int col, int first_move, vector<int> &valid_moves);
 
 // True if move is dangerous - DEFAULT + KING
 bool danger_dfs(const vector<Tile> &tiles, int depth, int max_depth, int row,
-    int col, int first_move);
+    int col, char team);
 
 // Check seen array for most open starting move - KING
 void open_dfs(const vector<Tile> &tiles, int depth, int max_depth, int row,
@@ -45,7 +45,7 @@ int main() {
     // Shuffle Directions to randomise
     random_device rd;
     mt19937 shuffler(rd());
-    shuffle(directions.begin(), directions.end(), shuffler);
+    // shuffle(directions.begin(), directions.end(), shuffler);
 
     while (update(ct, game)) {
         auto const here = ct.get_position();
@@ -71,14 +71,25 @@ int main() {
             }
         }
 
+        vector<vector<int>> dir = {{-1, 0}, {0, 1}, {1, 0}, {0, -1}};
+        vector<int> valid_moves(4, 1);
+
+        if (state == 0 || state == KING) {
+            for (int max_depth = 1; max_depth <= 3; max_depth++) {
+                for (int i = 0; i < 4; i++) {
+                    valid_moves[i] = !danger_dfs(tiles, 0, max_depth, 3+dir[i][0], 3+dir[i][1], ct.get_team().value);
+                }
+            }
+            memset(seen, false, sizeof(seen));
+        }
+
         // Default strategy, get the closest pearl
         // Depth based DFS to get the closest pearl
         // increase depth from 1 to 15 until a pearl is found
         if (!moved) {
             for (int max_depth = 1; max_depth < 15; max_depth++) {
-                int move = depth_dfs(tiles, 0, max_depth, 3, 3, -1);
+                int move = depth_dfs(tiles, 0, max_depth, 3, 3, -1, valid_moves);
                 if (move != -1) {
-                    ct.output_log("Moving in", directions[move]);
                     ct.make_move(directions[move]);
                     moved = true;
                     break;
@@ -86,9 +97,12 @@ int main() {
             }
         }
 
-        // Fallback: If there is no pearl then move randomly in a valid direction
+        // Fallback: If there is no pearl then move in the first valid direction
         if (!moved) {
-            for (auto const direction : directions) {
+            for (int i = 0; i < 4; i++) {
+                if (!valid_moves[i]) continue;
+                Direction direction = directions[i];
+
                 // Check that no wall is blocking you from moving to next tile
                 if (hereTile && !hereTile->get_edge(direction).is_passable()) {
                     continue;
@@ -179,16 +193,16 @@ bool kill_depth_dfs(const vector<Tile> &tiles, int depth,
         }
 
         // Check that no dragon body in this tile (we can't attack the body)
-        if (tiles[nr * 7 + nc].get_dragon() && !tiles[row * 7 + col].get_dragon()->is_dragon_head) continue;
+        if (tiles[nr * 7 + nc].get_dragon() && !tiles[nr * 7 + nc].get_dragon()->is_dragon_head) continue;
 
         move.push_back(direction);
 
         if (kill_depth_dfs(tiles, depth+1, max_depth, nr, nc, team, move)) {
+            seen[row][col] = false;
             return true;
         }
 
         move.pop_back();
-        seen[row][col] = false;
     }
 
     seen[row][col] = false;
@@ -199,12 +213,58 @@ bool kill_depth_dfs(const vector<Tile> &tiles, int depth,
 // Depth based DFS to get the closest pearl
 // Return the direction that finds a pearl first
 int depth_dfs(const vector<Tile> &tiles, int depth,
-    int max_depth, int row, int col, int first_move
+    int max_depth, int row, int col, int first_move, vector<int> &valid_moves
 ) {
     auto const& curr = tiles[row * 7 + col];
 
     if (curr.has_pearl()) return first_move;
     if (depth == max_depth) return -1;
+
+    seen[row][col] = true;
+
+    for (int i = 0; i < 4; i++) {
+        if (depth == 0 && !valid_moves[i]) continue;
+        auto direction = directions[i];
+
+        pair<int, int> offset = direction.get_offset();
+        int nr = row + offset.second;
+        int nc = col + offset.first;
+
+        // Inbounds of grid, not visited and no kelp blocking
+        if ((nr < 0 || nr >= 7 || nc < 0 || nc >= 7) ||
+            seen[nr][nc] || !curr.get_edge(direction).is_passable()
+        ) {
+            continue;
+        }
+
+        // Check that no dragon is in this tile
+        if (tiles[nr * 7 + nc].get_dragon()) continue;
+
+        int result = depth_dfs(tiles, depth+1, max_depth, nr, nc, depth == 0 ? i : first_move, valid_moves);
+        if (result != -1) {
+            seen[row][col] = false;
+            return result;
+        }
+    }
+
+    seen[row][col] = false;
+    return -1;
+}
+
+
+// True if move is dangerous - DEFAULT + KING
+bool danger_dfs(const vector<Tile> &tiles, int depth,
+    int max_depth, int row, int col, char team
+) {
+    auto const& curr = tiles[row * 7 + col];
+
+    // If its an enemy head
+    if (tiles[row * 7 + col].get_dragon() && tiles[row * 7 + col].get_dragon()->is_dragon_head && tiles[row * 7 + col].get_dragon()->get_team().value != team) return true;
+
+    // Nothing found in max range
+    if (depth == max_depth) {
+        return false;
+    }
 
     seen[row][col] = true;
 
@@ -222,16 +282,15 @@ int depth_dfs(const vector<Tile> &tiles, int depth,
             continue;
         }
 
-        // Check that no dragon is in this tile
-        if (tiles[nr * 7 + nc].get_dragon()) continue;
+        // Check that no dragon body in this tile (we can't attack the body)
+        if (tiles[nr * 7 + nc].get_dragon() && !tiles[nr * 7 + nc].get_dragon()->is_dragon_head && tiles[nr * 7 + nc].get_dragon()->get_team().value == team)  continue;
 
-        int result = depth_dfs(tiles, depth+1, max_depth, nr, nc, depth == 0 ? i : first_move);
-        if (result != -1) {
+        if (danger_dfs(tiles, depth+1, max_depth, nr, nc, team)) {
             seen[row][col] = false;
-            return result;
+            return true;
         }
     }
 
     seen[row][col] = false;
-    return -1;
+    return false;
 }
