@@ -144,14 +144,15 @@ int main() {
 
         // A KING dragon and BOMBER dragons constantly convert all normal
         // dragons inrange into a BOMBER using sonar
-        if (state == KING || state == BOMB) {
+        // if (state == KING || state == BOMB) {
+        if (state == KING) {
             for (auto const direction : directions) {
                 ct.send_sonar(direction, BOMB);
             }
         }
 
-        // A normal dragon if smaller than 6, will become a BOMBER on infection
-        if (state == 0 && ct.get_length() <= 5) {
+        // A normal dragon if smaller than 5, will become a BOMBER on infection
+        if (state == 0 && ct.get_length() <= 4) {
             for (auto const message : ct.get_sonar_messages()) {
                 state = BOMB;
             }
