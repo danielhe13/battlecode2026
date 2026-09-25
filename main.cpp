@@ -119,10 +119,10 @@ int main() {
             }
         }
 
-        // For dragons longer than 11, they have a 5% chance to split instead
+        // For dragons longer than 11, they have a 25% chance to split instead
         // of moving (to increase population)
         mt19937 gen(rd());
-        uniform_int_distribution<int> distrib(1, 20);
+        uniform_int_distribution<int> distrib(1, 4);
         if (distrib(gen) == 1 && ct.get_length() >= 12 && ct.can_split(2)) {
             ct.do_split(2);
             moved = true;
