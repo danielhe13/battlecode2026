@@ -17,11 +17,24 @@ bool seen[7][7] = {};
 
 
 /* Strategies DFS Edition */
+
+// True if can kill - BOMBER
 bool kill_depth_dfs(const vector<Tile> &tiles, int depth,
     int max_depth, int row, int col, char team, vector<Direction> &move);
 
+// Best starting move for pearl -  DEFAULT
 int depth_dfs(const vector<Tile> &tiles, int depth, int max_depth, int row,
     int col, int first_move);
+
+// True if move is dangerous - DEFAULT + KING
+bool danger_dfs(const vector<Tile> &tiles, int depth, int max_depth, int row,
+    int col, int first_move);
+
+// Check seen array for most open starting move - KING
+void open_dfs(const vector<Tile> &tiles, int depth, int max_depth, int row,
+    int col, int first_move);
+
+// Shout - All len == 2 in range 7 die on their turn
 
 
 /* MAIN */
